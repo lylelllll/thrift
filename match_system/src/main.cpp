@@ -43,32 +43,39 @@ class Pool
 {
     public:
         void save_result(int a, int b){
-            puts("match success");
-            std::shared_ptr<TTransport> socket(new TSocket("123.57.47.211", 9090));
+            /*std::shared_ptr<TTransport> socket(new TSocket("123.57.47.211", 9090));
             std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
             std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
             SaveClient client(protocol);
             try {
-                puts("save data");
-                transport->open();
-                puts("2");
+                //transport->open();
+                // puts("2");
                 //int res = client.save_data("acs_2400", "8030b0e9",a ,b);
                 //if(!res)puts("success");
                 //else puts("failed");
                 //transport->close();
             } catch (TException& tx) {
                 cout << "ERROR: " << tx.what() << endl;
-            }
+            }*/
+            printf("match success:%d %d\n",a ,b);
         }
 
 
         void match(){
             while(users.size()>1){
-                auto a = users[0], b = users[1];
-                users.erase(users.begin());
-                users.erase(users.begin());
-
-                save_result(a.id, b.id);
+                sort(users.begin(), users.end(), [&](User &a, User b){return a.score < b.score;});
+                bool flag = true;
+                for(uint32_t i = 1; i < users.size(); i++){
+                    auto a = users[i-1], b = users[i];
+                    if(b.score - a.score <= 50){
+                        //左闭右开
+                        users.erase(users.begin()+i-1, users.begin()+i+1);
+                        save_result(a.id , b.id);
+                        flag = false;
+                        break;
+                    }
+                }
+                if(flag) break;
             }
         }
 
@@ -124,7 +131,10 @@ void consume_task()
     {
         unique_lock<mutex> lck(message_queue.m);
         if(message_queue.q.empty()){
-            message_queue.cv.wait(lck);
+            //message_queue.cv.wait(lck);
+            lck.unlock();
+            pool.match();
+            sleep(1);
         }
         else{
             auto task = message_queue.q.front();
@@ -133,7 +143,6 @@ void consume_task()
 
             if(task.type == "add")pool.add(task.user);
             else if(task.type == "remove")pool.remove(task.user);
-            pool.match();
         }
     }
 }
